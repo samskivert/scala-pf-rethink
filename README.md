@@ -163,7 +163,7 @@ The reported results were obtained in the following environment:
 
     Scala code runner version 2.8.0.final -- Copyright 2002-2010, LAMP/EPFL
 
-### <0 `{ case x if (java.lang.Integer.parseInt(str) < 0) => x }`
+### LT0 `{ case x if (java.lang.Integer.parseInt(str) < 0) => x }`
 
     [info]       PartialFunction   PartFuncPlus       SemiFunc      Collector
     [info]   Mostly hit   841098   575510 0.68x   622665 0.74x   777801 0.92x
@@ -266,7 +266,7 @@ to avoid `foreach` and its associated closure creation.
       sum
     }
 
-### <0 `{ case x if (java.lang.Integer.parseInt(str) < 0) => x }`
+### LT0 `{ case x if (java.lang.Integer.parseInt(str) < 0) => x }`
 
     [info]       PartialFunction   PartFuncPlus       SemiFunc      Collector
     [info]   Mostly hit   675236   447156 0.66x   456765 0.68x   648598 0.96x
