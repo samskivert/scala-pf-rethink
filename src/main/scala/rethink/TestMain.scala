@@ -13,6 +13,7 @@ trait FuncImpl {
   val lessZero: PF[String,String]
   val extractLeft: PF[Either[String,String],String]
   val extractHead: PF[List[String],String]
+  def collect[A,B] (data :Traversable[A], pf :PF[A,B]): Traversable[B]
   def collectSumLen[A](data: Array[A], pf: PF[A,String]): Int
 }
 
@@ -51,10 +52,10 @@ object TestMain
                       "50/50" -> mkListData(100, 100),
                       "Mostly miss" -> mkListData(25, 175))
 
-  def testFuncImpl(iters: Int)(impl: FuncImpl) = {
+  def testCollectSumLen(iters: Int)(impl: FuncImpl) = {
     var results = Buffer[(String,Long)]()
 
-    def testCollectSumLen[A](
+    def runTest[A](
       pf: impl.PF[A,String],
       pfid :String,
       data :List[(String,Array[A])],
@@ -78,9 +79,43 @@ object TestMain
       results += (("Total " + pfid) -> sum)
     }
 
-    testCollectSumLen(impl.lessZero, "(<0)", lessZeroData, iters)
-    testCollectSumLen(impl.extractLeft, "(Left)", eitherData, iters)
-    testCollectSumLen(impl.extractHead, "(List)", listData, iters)
+    runTest(impl.lessZero, "(<0)", lessZeroData, iters)
+    runTest(impl.extractLeft, "(Left)", eitherData, iters)
+    runTest(impl.extractHead, "(List)", listData, iters)
+
+    results.toSeq
+  }
+
+  def testCollect(iters: Int)(impl: FuncImpl) = {
+    var results = Buffer[(String,Long)]()
+
+    def runTest[A](
+      pf: impl.PF[A,String],
+      pfid :String,
+      data :List[(String,Array[A])],
+      iters: Int
+    ) = {
+      var sum: Long = 0
+      var d = data
+      while (!d.isEmpty) {
+        var elapsed: Long = 0
+        var ii = 0
+        while (ii < iters) {
+          val start = System.nanoTime
+          impl.collect(d.head._2, pf)
+          elapsed += (System.nanoTime - start)
+          ii += 1
+        }
+        sum += elapsed/1000
+        results += (d.head._1 -> elapsed/1000)
+        d = d.tail
+      }
+      results += (("Total " + pfid) -> sum)
+    }
+
+    runTest(impl.lessZero, "(<0)", lessZeroData, iters)
+    runTest(impl.extractLeft, "(Left)", eitherData, iters)
+    runTest(impl.extractHead, "(List)", listData, iters)
 
     results.toSeq
   }
@@ -88,28 +123,31 @@ object TestMain
   def main (args: Array[String]) {
     val tests = List(PartFuncPlusTest, SemiFuncTest, CollectorTest)
 
-    println("--- Warming up ---")
-    (PartialFunctionTest :: tests) foreach testFuncImpl(25000)
+    for ((func, tester) <- List(("collectSumLen" -> testCollectSumLen _),
+                                ("collect" -> testCollect _))) {
+      println("--- Warming up (" + func + ") ---")
+      (PartialFunctionTest :: tests) foreach tester(25000)
 
-    println("--- Warming up (2) ---")
-    (PartialFunctionTest :: tests) foreach testFuncImpl(25000)
+      println("--- Warming up again (" + func + ") ---")
+      (PartialFunctionTest :: tests) foreach tester(25000)
 
-    println("--- Testing ---")
-    val base = testFuncImpl(50000)(PartialFunctionTest)
-    val exps = tests map testFuncImpl(50000)
+      println("--- Testing (" + func + ") ---")
+      val base = tester(50000)(PartialFunctionTest)
+      val exps = tests map tester(50000)
 
-    println("--- Testing complete ---")
+      println("--- Testing complete (" + func + ") ---")
 
-    printf("     %16s", PartialFunctionTest.name)
-    tests foreach { t => printf(" %14s", t.name) }
-    println("")
-
-    for (ii <- 0 until base.size) {
-      printf("%12s %8d", base(ii)._1, base(ii)._2)
-      for (exp <- exps) {
-        printf(" %8d %1.2fx", exp(ii)._2, (exp(ii)._2.toDouble / base(ii)._2))
-      }
+      printf("     %16s", PartialFunctionTest.name)
+      tests foreach { t => printf(" %14s", t.name) }
       println("")
+
+      for (ii <- 0 until base.size) {
+        printf("%12s %8d", base(ii)._1, base(ii)._2)
+        for (exp <- exps) {
+          printf(" %8d %1.2fx", exp(ii)._2, (exp(ii)._2.toDouble / base(ii)._2))
+        }
+        println("")
+      }
     }
   }
 }
